@@ -15,8 +15,7 @@ import (
 
 // Attacker is an attack executor which wraps an http.Client
 type Attacker struct {
-	dialer *net.Dialer
-	// client     http.Client
+	dialer     *net.Dialer
 	client     fasthttp.Client
 	stopch     chan struct{}
 	workers    uint64
@@ -381,20 +380,18 @@ func (a *Attacker) hit(tr Targeter, name string) *Result {
 		fasthttp.ReleaseRequest(request)
 		fasthttp.ReleaseResponse(response)
 	}()
-	request.Header.SetMethod("GET")
-	request.SetRequestURI("http://example.com")
-	request.SetBodyString("test")
 
 	if name != "" {
 		request.Header.Set("X-Vegeta-Attack", name)
 	}
-
+	// host := request.URI().Host() // TODO: Cache this shit
+	// request.Header.SetHost(string(host))
+	request.Header.SetHost("localhost")
 	request.Header.Set("X-Vegeta-Seq", strconv.FormatUint(res.Seq, 10))
 
 	// if a.chunked {
 	// 	request.TransferEncoding = append(req.TransferEncoding, "chunked")
 	// }
-
 	err = a.client.Do(request, response)
 	if err != nil {
 		return &res

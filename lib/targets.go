@@ -31,7 +31,6 @@ type Target struct {
 // Request creates an *http.Request out of Target and returns it along with an
 // error in case of failure.
 func (t *Target) Request() (*fasthttp.Request, error) {
-	// req := http.AcquireRequest()
 	req := fasthttp.AcquireRequest()
 	req.SetRequestURI(t.URL)
 	req.Header.SetMethod(t.Method)
