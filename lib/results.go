@@ -7,10 +7,8 @@ import (
 	"encoding/csv"
 	"encoding/gob"
 	"io"
-	"net/textproto"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mailru/easyjson/jlexer"
@@ -24,18 +22,18 @@ func init() {
 
 // Result contains the results of a single Target hit.
 type Result struct {
-	Attack    string                  `json:"attack"`
-	Seq       uint64                  `json:"seq"`
-	Code      uint16                  `json:"code"`
-	Timestamp time.Time               `json:"timestamp"`
-	Latency   time.Duration           `json:"latency"`
-	BytesOut  uint64                  `json:"bytes_out"`
-	BytesIn   uint64                  `json:"bytes_in"`
-	Error     string                  `json:"error"`
-	Body      []byte                  `json:"body"`
-	Method    string                  `json:"method"`
-	URL       string                  `json:"url"`
-	Headers   fasthttp.ResponseHeader `json:"headers"`
+	Attack    string        `json:"attack"`
+	Seq       uint64        `json:"seq"`
+	Code      uint16        `json:"code"`
+	Timestamp time.Time     `json:"timestamp"`
+	Latency   time.Duration `json:"latency"`
+	BytesOut  uint64        `json:"bytes_out"`
+	BytesIn   uint64        `json:"bytes_in"`
+	Error     string        `json:"error"`
+	Body      []byte        `json:"body"`
+	Method    string        `json:"method"`
+	URL       string        `json:"url"`
+	// Headers   fasthttp.ResponseHeader `json:"headers"`
 }
 
 // End returns the time at which a Result ended.
@@ -53,8 +51,9 @@ func (r Result) Equal(other Result) bool {
 		r.Error == other.Error &&
 		bytes.Equal(r.Body, other.Body) &&
 		r.Method == other.Method &&
-		r.URL == other.URL &&
-		headerEqual(r.Headers, other.Headers)
+		r.URL == other.URL
+	// &&
+	// headerEqual(r.Headers, other.Headers)
 }
 
 func headerEqual(h1 fasthttp.ResponseHeader, h2 fasthttp.ResponseHeader) bool {
@@ -177,7 +176,7 @@ func NewCSVEncoder(w io.Writer) Encoder {
 			strconv.FormatUint(r.Seq, 10),
 			r.Method,
 			r.URL,
-			base64.StdEncoding.EncodeToString(headerBytes(r.Headers)),
+			// base64.StdEncoding.EncodeToString(headerBytes(r.Headers)),
 		})
 		if err != nil {
 			return err
@@ -246,17 +245,17 @@ func NewCSVDecoder(r io.Reader) Decoder {
 		r.Method = rec[9]
 		r.URL = rec[10]
 
-		pr := textproto.NewReader(bufio.NewReader(
-			base64.NewDecoder(base64.StdEncoding, strings.NewReader(rec[11]))))
-		hdr, err := pr.ReadMIMEHeader()
-		if err != nil {
-			return err
-		}
-		for key, values := range hdr {
-			for _, value := range values {
-				r.Headers.Add(key, value)
-			}
-		}
+		// pr := textproto.NewReader(bufio.NewReader(
+		// 	base64.NewDecoder(base64.StdEncoding, strings.NewReader(rec[11]))))
+		// hdr, err := pr.ReadMIMEHeader()
+		// if err != nil {
+		// 	return err
+		// }
+		// for key, values := range hdr {
+		// 	for _, value := range values {
+		// 		r.Headers.Add(key, value)
+		// 	}
+		// }
 
 		return err
 	}

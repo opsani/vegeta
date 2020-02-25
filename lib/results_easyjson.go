@@ -68,8 +68,8 @@ func easyjsonBd1621b8DecodeGithubComTsenartVegetaLib(in *jlexer.Lexer, out *json
 			out.Method = string(in.String())
 		case "url":
 			out.URL = string(in.String())
-		case "headers":
-			out.Headers = easyjsonUnmarshalHeaders(in)
+		// case "headers":
+		// 	out.Headers = easyjsonUnmarshalHeaders(in)
 		default:
 			in.SkipRecursive()
 		}
@@ -142,7 +142,7 @@ func easyjsonBd1621b8EncodeGithubComTsenartVegetaLib(out *jwriter.Writer, in jso
 	{
 		const prefix string = ",\"headers\":"
 		out.RawString(prefix)
-		easyjsonMarshalHeaders(out, in.Headers)
+		// easyjsonMarshalHeaders(out, in.Headers)
 	}
 	out.RawByte('}')
 }

@@ -421,7 +421,7 @@ func (a *Attacker) hit(tr Targeter, name string) *Result {
 		res.Error = string(statusCode)
 	}
 
-	response.Header.CopyTo(&res.Headers)
+	// response.Header.CopyTo(&res.Headers)
 
 	return &res
 }
