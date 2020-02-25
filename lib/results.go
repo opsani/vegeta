@@ -7,7 +7,6 @@ import (
 	"encoding/csv"
 	"encoding/gob"
 	"io"
-	"net/http"
 	"net/textproto"
 	"sort"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/valyala/fasthttp"
 )
 
 func init() {
@@ -24,18 +24,18 @@ func init() {
 
 // Result contains the results of a single Target hit.
 type Result struct {
-	Attack    string        `json:"attack"`
-	Seq       uint64        `json:"seq"`
-	Code      uint16        `json:"code"`
-	Timestamp time.Time     `json:"timestamp"`
-	Latency   time.Duration `json:"latency"`
-	BytesOut  uint64        `json:"bytes_out"`
-	BytesIn   uint64        `json:"bytes_in"`
-	Error     string        `json:"error"`
-	Body      []byte        `json:"body"`
-	Method    string        `json:"method"`
-	URL       string        `json:"url"`
-	Headers   http.Header   `json:"headers"`
+	Attack    string                  `json:"attack"`
+	Seq       uint64                  `json:"seq"`
+	Code      uint16                  `json:"code"`
+	Timestamp time.Time               `json:"timestamp"`
+	Latency   time.Duration           `json:"latency"`
+	BytesOut  uint64                  `json:"bytes_out"`
+	BytesIn   uint64                  `json:"bytes_in"`
+	Error     string                  `json:"error"`
+	Body      []byte                  `json:"body"`
+	Method    string                  `json:"method"`
+	URL       string                  `json:"url"`
+	Headers   fasthttp.ResponseHeader `json:"headers"`
 }
 
 // End returns the time at which a Result ended.
@@ -57,26 +57,20 @@ func (r Result) Equal(other Result) bool {
 		headerEqual(r.Headers, other.Headers)
 }
 
-func headerEqual(h1, h2 http.Header) bool {
-	if len(h1) != len(h2) {
+func headerEqual(h1 fasthttp.ResponseHeader, h2 fasthttp.ResponseHeader) bool {
+	if h1.Len() != h2.Len() {
 		return false
 	}
-	if h1 == nil || h2 == nil {
-		return h1 == nil && h2 == nil
-	}
-	for key, values1 := range h1 {
-		values2 := h2[key]
+	equal := true
+	h1.VisitAll(func(key, values1 []byte) {
+		values2 := h2.PeekBytes(key)
 		if len(values1) != len(values2) {
-			return false
+			equal = false
+			return
 		}
-		for i := range values1 {
-			if values1[i] != values2[i] {
-				return false
-			}
-		}
-	}
+	})
 
-	return true
+	return equal
 }
 
 // Results is a slice of Result type elements.
@@ -195,12 +189,9 @@ func NewCSVEncoder(w io.Writer) Encoder {
 	}
 }
 
-func headerBytes(h http.Header) []byte {
-	if h == nil {
-		return nil
-	}
+func headerBytes(h fasthttp.ResponseHeader) []byte {
 	var hdr bytes.Buffer
-	_ = h.Write(&hdr)
+	h.WriteTo(&hdr)
 	return append(hdr.Bytes(), '\r', '\n')
 }
 
@@ -261,7 +252,11 @@ func NewCSVDecoder(r io.Reader) Decoder {
 		if err != nil {
 			return err
 		}
-		r.Headers = http.Header(hdr)
+		for key, values := range hdr {
+			for _, value := range values {
+				r.Headers.Add(key, value)
+			}
+		}
 
 		return err
 	}

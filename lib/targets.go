@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -16,31 +15,30 @@ import (
 
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/valyala/fasthttp"
 )
 
 // Target is an HTTP request blueprint.
 //
 //go:generate go run ../internal/cmd/jsonschema/main.go -type=Target -output=target.schema.json
 type Target struct {
-	Method string      `json:"method"`
-	URL    string      `json:"url"`
-	Body   []byte      `json:"body,omitempty"`
-	Header http.Header `json:"header,omitempty"`
+	Method string                 `json:"method"`
+	URL    string                 `json:"url"`
+	Body   []byte                 `json:"body,omitempty"`
+	Header fasthttp.RequestHeader `json:"header,omitempty"`
 }
 
 // Request creates an *http.Request out of Target and returns it along with an
 // error in case of failure.
-func (t *Target) Request() (*http.Request, error) {
-	req, err := http.NewRequest(t.Method, t.URL, bytes.NewReader(t.Body))
-	if err != nil {
-		return nil, err
-	}
-	for k, vs := range t.Header {
-		req.Header[k] = make([]string, len(vs))
-		copy(req.Header[k], vs)
-	}
-	if host := req.Header.Get("Host"); host != "" {
-		req.Host = host
+func (t *Target) Request() (*fasthttp.Request, error) {
+	// req := http.AcquireRequest()
+	req := fasthttp.AcquireRequest()
+	req.SetRequestURI(t.URL)
+	req.Header.SetMethod(t.Method)
+	req.SetBody(t.Body)
+	t.Header.CopyTo(&req.Header)
+	if host := req.Header.Host(); len(host) != 0 {
+		req.SetHostBytes(host)
 	}
 	return req, nil
 }
@@ -56,23 +54,23 @@ func (t *Target) Equal(other *Target) bool {
 		equal := t.Method == other.Method &&
 			t.URL == other.URL &&
 			bytes.Equal(t.Body, other.Body) &&
-			len(t.Header) == len(other.Header)
+			t.Header.Len() == other.Header.Len()
 
 		if !equal {
 			return false
 		}
 
-		for k := range t.Header {
-			left, right := t.Header[k], other.Header[k]
+		t.Header.VisitAll(func(k, left []byte) {
+			right := t.Header.PeekBytes(k)
 			if len(left) != len(right) {
-				return false
+				equal = false
+				return
 			}
-			for i := range left {
-				if left[i] != right[i] {
-					return false
-				}
+			if bytes.Equal(left, right) != true {
+				equal = false
+				return
 			}
-		}
+		})
 
 		return true
 	}
@@ -122,7 +120,7 @@ func (tr Targeter) Decode(t *Target) error {
 // body will be set as the Target's body if no body is provided in each target definiton.
 // hdr will be merged with the each Target's headers.
 //
-func NewJSONTargeter(src io.Reader, body []byte, header http.Header) Targeter {
+func NewJSONTargeter(src io.Reader, body []byte, header *fasthttp.RequestHeader) Targeter {
 	type reader struct {
 		*bufio.Reader
 		sync.Mutex
@@ -169,17 +167,13 @@ func NewJSONTargeter(src io.Reader, body []byte, header http.Header) Targeter {
 			tgt.Body = t.Body
 		}
 
-		if tgt.Header == nil {
-			tgt.Header = http.Header{}
-		}
+		header.VisitAll(func(k, v []byte) {
+			tgt.Header.AddBytesKV(k, v)
+		})
 
-		for k, vs := range header {
-			tgt.Header[k] = append(tgt.Header[k], vs...)
-		}
-
-		for k, vs := range t.Header {
-			tgt.Header[k] = append(tgt.Header[k], vs...)
-		}
+		t.Header.VisitAll(func(k, v []byte) {
+			tgt.Header.AddBytesKV(k, v)
+		})
 
 		return nil
 	}
@@ -252,7 +246,7 @@ func ReadAllTargets(t Targeter) (tgts []Target, err error) {
 //
 // body will be set as the Target's body if no body is provided.
 // hdr will be merged with the each Target's headers.
-func NewHTTPTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
+func NewHTTPTargeter(src io.Reader, body []byte, hdr *fasthttp.RequestHeader) Targeter {
 	var mu sync.Mutex
 	sc := peekingScanner{src: bufio.NewScanner(src)}
 	return func(tgt *Target) (err error) {
@@ -276,10 +270,8 @@ func NewHTTPTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
 		}
 
 		tgt.Body = body
-		tgt.Header = http.Header{}
-		for k, vs := range hdr {
-			tgt.Header[k] = vs
-		}
+		tgt.Header = fasthttp.RequestHeader{}
+		hdr.CopyTo(&tgt.Header)
 
 		tokens := strings.SplitN(line, " ", 2)
 		if len(tokens) < 2 {
@@ -320,7 +312,7 @@ func NewHTTPTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
 			// Add key/value directly to the http.Header (map[string][]string).
 			// http.Header.Add() canonicalizes keys but vegeta is used
 			// to test systems that require case-sensitive headers.
-			tgt.Header[tokens[0]] = append(tgt.Header[tokens[0]], tokens[1])
+			// tgt.Header[tokens[0]] = append(tgt.Header[tokens[0]], tokens[1])
 		}
 		if err = sc.Err(); err != nil {
 			return ErrNoTargets

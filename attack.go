@@ -17,6 +17,7 @@ import (
 
 	"github.com/tsenart/vegeta/internal/resolver"
 	vegeta "github.com/tsenart/vegeta/lib"
+	"github.com/valyala/fasthttp"
 )
 
 func attackCmd() command {
@@ -143,11 +144,19 @@ func attack(opts *attackOpts) (err error) {
 		proxyHdr = opts.proxyHeaders.Header
 	)
 
+	// Copy the headers into a FastHTTP representation
+	var headers fasthttp.RequestHeader
+	for key, values := range hdr {
+		for _, value := range values {
+			headers.Add(key, value)
+		}
+	}
+
 	switch opts.format {
 	case vegeta.JSONTargetFormat:
-		tr = vegeta.NewJSONTargeter(src, body, hdr)
+		tr = vegeta.NewJSONTargeter(src, body, &headers)
 	case vegeta.HTTPTargetFormat:
-		tr = vegeta.NewHTTPTargeter(src, body, hdr)
+		tr = vegeta.NewHTTPTargeter(src, body, &headers)
 	default:
 		return fmt.Errorf("format %q isn't one of [%s]",
 			opts.format, strings.Join(vegeta.TargetFormats, ", "))

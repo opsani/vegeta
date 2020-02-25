@@ -4,10 +4,9 @@
 package vegeta
 
 import (
-	http "net/http"
-
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/valyala/fasthttp"
 )
 
 type jsonTarget Target
@@ -48,12 +47,12 @@ func (t *jsonTarget) decode(in *jlexer.Lexer) {
 			} else {
 				in.Delim('{')
 				if !in.IsDelim('}') {
-					t.Header = make(http.Header)
+					t.Header = fasthttp.RequestHeader{}
 				} else {
-					t.Header = nil
+					// t.Header = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					// key := string(in.String())
 					in.WantColon()
 					var v2 []string
 					if in.IsNull() {
@@ -78,7 +77,9 @@ func (t *jsonTarget) decode(in *jlexer.Lexer) {
 						}
 						in.Delim(']')
 					}
-					(t.Header)[key] = v2
+					for _, value := range v2 {
+						t.Header.Add(key, value)
+					}
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -128,7 +129,7 @@ func (t jsonTarget) encode(out *jwriter.Writer) {
 		}
 		out.Base64Bytes(t.Body)
 	}
-	if len(t.Header) != 0 {
+	if t.Header.Len() != 0 {
 		const prefix string = ",\"header\":"
 		if first {
 			first = false
@@ -138,28 +139,28 @@ func (t jsonTarget) encode(out *jwriter.Writer) {
 		}
 		{
 			out.RawByte('{')
-			v6First := true
-			for v6Name, v6Value := range t.Header {
-				if v6First {
-					v6First = false
-				} else {
-					out.RawByte(',')
-				}
-				out.String(string(v6Name))
-				out.RawByte(':')
-				if v6Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
-					out.RawString("null")
-				} else {
-					out.RawByte('[')
-					for v7, v8 := range v6Value {
-						if v7 > 0 {
-							out.RawByte(',')
-						}
-						out.String(string(v8))
-					}
-					out.RawByte(']')
-				}
-			}
+			// v6First := true
+			// for v6Name, v6Value := range t.Header {
+			// 	if v6First {
+			// 		v6First = false
+			// 	} else {
+			// 		out.RawByte(',')
+			// 	}
+			// 	out.String(string(v6Name))
+			// 	out.RawByte(':')
+			// 	if v6Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+			// 		out.RawString("null")
+			// 	} else {
+			// 		out.RawByte('[')
+			// 		for v7, v8 := range v6Value {
+			// 			if v7 > 0 {
+			// 				out.RawByte(',')
+			// 			}
+			// 			out.String(string(v8))
+			// 		}
+			// 		out.RawByte(']')
+			// 	}
+			// }
 			out.RawByte('}')
 		}
 	}

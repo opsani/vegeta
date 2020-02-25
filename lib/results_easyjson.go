@@ -4,12 +4,12 @@ package vegeta
 
 import (
 	json "encoding/json"
-	"net/http"
 	time "time"
 
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/valyala/fasthttp"
 )
 
 // suppress unused package warning
@@ -147,13 +147,13 @@ func easyjsonBd1621b8EncodeGithubComTsenartVegetaLib(out *jwriter.Writer, in jso
 	out.RawByte('}')
 }
 
-func easyjsonUnmarshalHeaders(in *jlexer.Lexer) http.Header {
-	h := http.Header{}
+func easyjsonUnmarshalHeaders(in *jlexer.Lexer) fasthttp.ResponseHeader {
+	h := fasthttp.ResponseHeader{}
 	in.Delim('[')
 	for !in.IsDelim(']') {
 		for in.IsDelim('{') {
 			in.Delim('{')
-			var key string
+			// var key string
 			var values []string
 			for !in.IsDelim('}') {
 				k := in.UnsafeString()
@@ -165,13 +165,14 @@ func easyjsonUnmarshalHeaders(in *jlexer.Lexer) http.Header {
 				}
 				switch k {
 				case "key":
-					key = in.String()
+					// key := in.String()
 				case "value":
 					values = append(values, in.String())
 				}
 				in.WantComma()
 			}
-			h[key] = values
+			// h[key] = values
+
 			in.Delim('}')
 			in.WantComma()
 		}
@@ -180,17 +181,15 @@ func easyjsonUnmarshalHeaders(in *jlexer.Lexer) http.Header {
 	return h
 }
 
-func easyjsonMarshalHeaders(w *jwriter.Writer, h http.Header) {
+func easyjsonMarshalHeaders(w *jwriter.Writer, h fasthttp.ResponseHeader) {
 	w.RawByte('[')
-	for key, values := range h {
-		for _, value := range values {
-			w.RawString(`{"key":`)
-			w.String(key)
-			w.RawString(`,"value":`)
-			w.String(value)
-			w.RawByte('}')
-		}
-	}
+	h.VisitAll(func(k, v []byte) {
+		w.RawString(`{"key":`)
+		w.String(string(k))
+		w.RawString(`,"value":`)
+		w.String(string(v))
+		w.RawByte('}')
+	})
 	w.RawByte(']')
 }
 
