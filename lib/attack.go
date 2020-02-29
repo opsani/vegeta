@@ -292,12 +292,12 @@ func (a *Attacker) Attack(tr Targeter, p Pacer, du time.Duration, name string) <
 				return
 			}
 
-			wait, stop := p.Pace(elapsed, count)
+			_, stop := p.Pace(elapsed, count)
 			if stop {
 				return
 			}
 
-			time.Sleep(wait)
+			// time.Sleep(wait)
 
 			if workers < a.maxWorkers {
 				select {
@@ -386,7 +386,7 @@ func (a *Attacker) hit(tr Targeter, name string) *Result {
 	}
 	// host := request.URI().Host() // TODO: Cache this shit
 	// request.Header.SetHost(string(host))
-	request.Header.SetHost("localhost")
+	request.Header.SetHost("172.31.35.140")
 	request.Header.Set("X-Vegeta-Seq", strconv.FormatUint(res.Seq, 10))
 
 	// if a.chunked {
